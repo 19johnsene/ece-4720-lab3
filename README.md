@@ -78,8 +78,7 @@ the next instruction during the next cycle. Since these values have to be passed
 next, we utilize pipeline registers to do so. The pipeline registers carry both data and control signals from
 one pipeline stage to another. Any value needed on a later pipeline stage should be placed in pipeline 
 register and forwarded from one stage to another until it is no longer needed (i.e., not used in the upcoming
-stages). Below is the pipelined datapath that you are going to build. For now, you can omit the branch related
-links and mux, and assume that PC is incremented by 4 at every cycle.
+stages). Below is the pipelined datapath that you are going to build. For now, you can omit the branch related links and mux, and assume that PC is incremented by 4 at every cycle.
 
 There are 4 pipeline registers and each of them has fields associated with proper temporary registers that
 we mentioned above (i.e. IR, A, B, imm, ALUOpt, LMD). The pipeline register called IF/ID has the following

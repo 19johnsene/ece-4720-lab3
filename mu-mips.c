@@ -327,6 +327,7 @@ void handle_pipeline()
 void WB()
 {
 	/*IMPLEMENT THIS*/
+	INSTRUCTION_COUNT++;
 }
 
 /************************************************************/
@@ -350,7 +351,31 @@ void EX()
 /************************************************************/
 void ID()
 {
-	/*IMPLEMENT THIS*/
+	uint32_t opcode;
+	uint32_t rs;
+	uint32_t rt;
+	uint32_t rd;
+	uint32_t shamt;
+	uint32_t funct;
+	uint32_t immediate;
+	uint32_t address;
+	uint32_t high, low;
+	uint32_t temp = 0;
+	
+	// ID/EX.IR <= IF/ID.IR
+	ID_EX.IR = ID_IF.IR;
+
+	// Decode the registers in the instruction
+	isolate_vars(ID_EX.IR, &opcode, &rs, &rt, &rd, &shamt, &funct, &immediate, &address);
+
+	// ID/EX.A <= REGS[ IF/ID.IR[rs] ]
+	ID_EX.A = CURRENT_STATE.REGS[rs];
+
+	// ID/EX.B <= REGS[ IF/ID.IR[rt] ]
+	ID_EX.B = CURRENT_STATE.REGS[rt];
+
+	// ID/EX.imm <= sign-extend( IF/ID.IR[imm. Field] )
+	ID_EX.imm = immediate;
 }
 
 /************************************************************/
@@ -358,9 +383,70 @@ void ID()
 /************************************************************/
 void IF()
 {
-	/*IMPLEMENT THIS*/
+	// IR <= Mem[PC] 
+	ID_IF.IR = mem_read_32(CURRENT_STATE.PC);
+
+	// PC <= PC + 4
+	ID_IF.PC = NEXT_STATE.PC + 4;
 }
 
+/**************************************************************/
+/* Isolates portions of 32-bit binary instruction to determine register                                */
+/* values (opcode, rs, rt, rd, shamt, funct, immediate, and address)                                   */
+/**************************************************************/
+void isolate_vars(uint32_t instruction_code,
+				uint32_t* opcode,
+				uint32_t* rs, 
+				uint32_t* rt, 
+				uint32_t* rd, 
+				uint32_t* shamt,
+				uint32_t* funct,
+				uint32_t* immediate,
+				uint32_t* address)
+		{
+		uint32_t temp;
+		
+		temp = instruction_code;
+		temp >>= 26;
+		*opcode = temp;
+
+		temp = instruction_code;
+		temp <<= 6;
+		temp >>= 27;
+		*rs = temp;
+
+		temp = instruction_code;
+		temp <<= 11;
+		temp >>= 27;
+		*rt = temp;
+
+		temp = instruction_code;
+		temp <<= 16;
+		temp >>= 27;
+		*rd = temp;
+
+		temp = instruction_code;
+		temp <<= 21;
+		temp >>= 27;
+		*shamt = temp;	
+
+		temp = instruction_code;
+		temp <<= 26;
+		temp >>= 26;
+		*funct = temp;
+
+		temp = instruction_code;
+		temp <<= 16;
+		temp >>= 16;
+		*immediate = temp;	
+
+		temp = instruction_code;
+		temp <<= 6;
+		temp >>= 6;
+		*address = temp;
+
+		return;			
+}
 
 /************************************************************/
 /* Initialize Memory                                                                                                    */ 

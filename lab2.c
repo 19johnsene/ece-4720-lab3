@@ -754,7 +754,7 @@ void convert_mips() {
 	printf("\nConverting MIPS to machine...\n");
 	// Read in MIPS instructions line by line
 	while(fgets(buffer, buffer_length, fp_i)) {
-		
+
 		char* temp = buffer;
 
 		// Get the instruction name
@@ -804,12 +804,15 @@ void convert_mips() {
 				}
 			break;
 
-			// BLEZ, BLTZ, BGEZ, BGTZ, BEQ, BNE (are all j format)
+			// BLEZ, BLTZ, BGEZ, BGTZ, BEQ, BNE
 			case('b'):
 			case('B'):
 				// BLEZ, BLTZ
-				// NEED TO SET RT == 0
+				// RT == 0
 				if (instr[1] == 'l' || instr[1] == 'L') {
+					uint32_t temp_rt = 0x0;
+					uint32_t temp_imm = 0x0;
+					uint32_t hold = 0x0;
 					if (instr[2] == 'e' || instr[2] == 'E') { // BLEZ
 						machine = 0x6; // opcode
 						machine <<= 26;
@@ -817,22 +820,47 @@ void convert_mips() {
 					} else { // BLTZ
 						machine = 0x1; // opcode
 						machine <<= 26;
-						// set rt == 0?
 						mips_regs_to_machine(1, regs, &machine);
 					}
+					// We need to set rt but maintain our other operands
+					temp_imm = machine;
+					temp_imm <<= 16;
+					temp_imm >>= 16;
+
+					hold = machine;
+					hold >>= 16;
+					hold += temp_rt;
+					hold <<= 16;
+					hold += temp_imm;
+					machine = hold;
+
 				// BGEZ, BGTZ
-				// NEED TO SET RT == 1
+				// RT == 1
 				} else if (instr[1] == 'g' || instr[1] == 'G') {
+					uint32_t temp_rt = 0x1;
+					uint32_t temp_imm = 0x0;
+					uint32_t hold = 0x0;
 					if (instr[2] == 'e' || instr[2] == 'E') { // BGEZ
 						machine = 0x1; // opcode
 						machine <<= 26;
-						// set rt == 1?
 						mips_regs_to_machine(1, regs, &machine);
 					} else { // BGTZ
 						machine = 0x7; // opcode
 						machine <<= 26;
 						mips_regs_to_machine(1, regs, &machine);
 					}
+					// We need to set rt but maintain our other operands
+					temp_imm = machine;
+					temp_imm <<= 16;
+					temp_imm >>= 16;
+
+					hold = machine;
+					hold >>= 16;
+					hold += temp_rt;
+					hold <<= 16;
+					hold += temp_imm;
+					machine = hold;
+				
 				} else if (instr[1] == 'e' || instr[1] == 'E') { // BEQ
 					machine = 0x4; // opcode
 					machine <<= 26;
@@ -1022,7 +1050,6 @@ void convert_mips() {
 					mips_regs_to_machine(3, regs, &machine);
 				} else if (instr[1] == 'y' || instr[1] == 'Y') { // SYSCALL
 					machine = 0x0; // opcode
-					mips_regs_to_machine(0, regs, &machine);
 					machine += 0xC; // funct
 				}
 			break;
@@ -1213,7 +1240,7 @@ void decode_machine_register(uint32_t reg, char* buffer) {
 uint32_t decode_mips_register(char* reg_str) {
 	uint32_t buffer = 0;
 	char reg = reg_str[0];
-	uint32_t reg_no = atoi(reg_str+2);
+	uint32_t reg_no = atoi(reg_str+1);
 
 	switch(reg) {
 		case ('z'):
@@ -1357,13 +1384,13 @@ void write_file(){
 	uint32_t addr;
 	FILE* fp;
 
-	printf("Please enter a name for the file to be generated:  \n");
+	printf("\nPlease enter a name for the file to be generated:  ");
 	if (scanf("%s", buffer) == EOF){
 		exit(0);
 	}
 
 	if ((fp = fopen(buffer, "w")) == NULL) {
-		printf("Error[write_file]: Could not write program to file\n");
+		printf("\nError[write_file]: Could not write program to file\n");
 		exit(0);
 	}
 	
@@ -1372,6 +1399,7 @@ void write_file(){
 		addr = MEM_TEXT_BEGIN + (i*4);
 		write_instruction(fp, addr);
 	}
+	printf("Success: File generation complete.\n\n");
 
 	fclose(fp);
 }
@@ -1951,7 +1979,7 @@ void write_instruction(FILE* fp, uint32_t addr) {
 					fprintf(fp, "sll ");
 					decode_machine_register(rd, reg_str);
 					fprintf(fp, "%s, ", reg_str);
-					decode_machine_register(rs, reg_str);
+					decode_machine_register(rt, reg_str);
 					fprintf(fp, "%s, %d\n", reg_str, shamt);
 				break;
 
@@ -1959,7 +1987,7 @@ void write_instruction(FILE* fp, uint32_t addr) {
 					fprintf(fp, "srl ");
 					decode_machine_register(rd, reg_str);
 					fprintf(fp, "%s, ", reg_str);
-					decode_machine_register(rs, reg_str);
+					decode_machine_register(rt, reg_str);
 					fprintf(fp, "%s, %d\n", reg_str, shamt);
 				break;
 
@@ -1967,7 +1995,7 @@ void write_instruction(FILE* fp, uint32_t addr) {
 					fprintf(fp, "sra ");
 					decode_machine_register(rd, reg_str);
 					fprintf(fp, "%s, ", reg_str);
-					decode_machine_register(rs, reg_str);
+					decode_machine_register(rt, reg_str);
 					fprintf(fp, "%s, %d\n", reg_str, shamt);
 				break;
 
@@ -2030,11 +2058,11 @@ void write_instruction(FILE* fp, uint32_t addr) {
 		// J-format
 		// [ op - 6][        const/address - 26        ]
 		case (0x2): // j
-			fprintf(fp, "j %x\n", (address << 2));
+			fprintf(fp, "j %d\n", (address << 2));
 		break;
 
 		case (0x3): // jal
-			fprintf(fp, "j %x\n", (address << 2));
+			fprintf(fp, "j %d\n", (address << 2));
 		break;
 
 		// I-format
@@ -2049,6 +2077,14 @@ void write_instruction(FILE* fp, uint32_t addr) {
 
 		case (0x9):  // addiu
 			fprintf(fp, "addiu ");
+			decode_machine_register(rt, reg_str);
+			fprintf(fp, "%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			fprintf(fp, "%s, %d\n", reg_str, immediate);	
+		break;
+
+		case (0xC):  // andi
+			fprintf(fp, "andi ");
 			decode_machine_register(rt, reg_str);
 			fprintf(fp, "%s, ", reg_str);
 			decode_machine_register(rs, reg_str);
@@ -2148,67 +2184,47 @@ void write_instruction(FILE* fp, uint32_t addr) {
 				fprintf(fp, "bltz ");
 			} 
 			decode_machine_register(rt, reg_str);
-			fprintf(fp, "%s, %x\n", reg_str, temp);
+			fprintf(fp, "%s, 0x%x\n", reg_str, temp);
 		break;
 		}
 
 		case (0x4): { // beq
 			temp = immediate;
-			for (int j = 16; j < 32; j++) {
-				temp += (1 << j);
-			}
-			temp <<= 2;
-			temp += CURRENT_STATE.PC;
 
 			fprintf(fp, "beq ");
 			decode_machine_register(rs, reg_str);
 			fprintf(fp, "%s, ", reg_str);
 			decode_machine_register(rt, reg_str);
-			fprintf(fp, "%s, %x\n", reg_str, temp);
+			fprintf(fp, "%s, 0x%x\n", reg_str, temp);
 		break;
 		}
 
 		case (0x5): { // bne
 			temp = immediate;
-			for (int j = 16; j < 32; j++) {
-				temp += (1 << j);
-			}
-			temp <<= 2;
-			temp += CURRENT_STATE.PC;
 			
 			fprintf(fp, "bne ");
 			decode_machine_register(rs, reg_str);
 			fprintf(fp, "%s, ", reg_str);
 			decode_machine_register(rt, reg_str);
-			fprintf(fp, "%s, %x\n", reg_str, temp);
+			fprintf(fp, "%s, 0x%x\n", reg_str, temp);
 		break;
 		}
 
 		case (0x6): { // blez
-			temp = immediate;
-			for (int j = 16; j < 32; j++) {
-				temp += (1 << j);
-			}
-			temp <<= 2;
-			temp += CURRENT_STATE.PC;			
+			temp = immediate;		
 			
 			fprintf(fp, "blez ");
 			decode_machine_register(rs, reg_str);
-			fprintf(fp, "%s, %x\n", reg_str, temp);
+			fprintf(fp, "%s, 0x%x\n", reg_str, temp);
 		break;
 		}
 
 		case (0x7): { // bgtz
 			temp = immediate;
-			for (int j = 16; j < 32; j++) {
-				temp += (1 << j);
-			}
-			temp <<= 2;
-			temp += CURRENT_STATE.PC;
 
 			fprintf(fp, "bgtz ");
 			decode_machine_register(rs, reg_str);
-			fprintf(fp, "%s, %x\n", reg_str, temp);
+			fprintf(fp, "%s, 0x%x\n", reg_str, temp);
 		break;
 		}
 
@@ -2235,14 +2251,17 @@ void mips_regs_to_machine(int format, char* mips_instr, uint32_t* machine_instr)
 	uint32_t shamt = 0; 
 	const char delim[2] = ",";
 	char* temp;
+	char* save = mips_instr;
 
 	switch (format) {
 		// R-Format
 		// [ op - 6][ rs - 5 ][ rt - 5 ][ rd - 5 ][ shamt - 5 ][ funct - 6 ]
 		case 0: {
-			temp = strtok(mips_instr, delim);
+			while ((temp = strtok_r(save, delim, &save))) {
+				if (count > 0) {
+					temp++;
+				}
 
-			while (temp != NULL) {
 				if (count == 2 && *(temp) != '$') { 
 					// Then we have a shamt
 					shamt = atoi(temp);
@@ -2271,8 +2290,6 @@ void mips_regs_to_machine(int format, char* mips_instr, uint32_t* machine_instr)
 					}
 				}
 				count++;
-				temp = strtok(NULL, delim);
-				temp++;
 			}
 
 		// Add rs, rt, rd, shamt all into the instruction to be returned
@@ -2320,11 +2337,18 @@ void mips_regs_to_machine(int format, char* mips_instr, uint32_t* machine_instr)
 		// I-Format
 		// NOTE: this case assumes typical format for I-instruction is being used
 		// [ op - 6][ rs - 5 ][ rt - 5 ][    immmediate - 16    ]
-		case 1:
-			temp = strtok(mips_instr, delim);
-
-			while (temp != NULL) {
-				if (count == 2 && *(temp) != '$') {
+		case 1: {
+			int branch_flag = 0;
+			while ((temp = strtok_r(save, delim, &save))) {
+				if (count > 0) {
+					temp++;
+				}		
+				
+				if (count == 1 && *(temp) != '$') {
+					branch_flag = 1;
+					immediate = strtol(temp, NULL, 16);
+					break; 
+				} else if (count == 2 && *(temp) != '$') {
 					immediate = atoi(temp);
 					break;
 				} else {
@@ -2346,17 +2370,24 @@ void mips_regs_to_machine(int format, char* mips_instr, uint32_t* machine_instr)
 					break;
 				}
 				count++;
-				temp = strtok(NULL, delim);
-				temp++;
 			}
-			reg_temp = r1;
-			reg_temp <<= 21;
-			*machine_instr += reg_temp;
-			reg_temp = r0;
-			reg_temp <<= 16;
-			*machine_instr += reg_temp;
-			*machine_instr += immediate;
+
+			if (branch_flag == 1) {
+				reg_temp = r0;
+				reg_temp <<= 21;
+				*machine_instr += reg_temp;
+				*machine_instr += immediate;
+			} else {
+				reg_temp = r1;
+				reg_temp <<= 21;
+				*machine_instr += reg_temp;
+				reg_temp = r0;
+				reg_temp <<= 16;
+				*machine_instr += reg_temp;
+				*machine_instr += immediate;
+			}
 		break;
+		}
 
 		// J-Format
 		// [ op - 6][        const/address - 26        ]
@@ -2369,9 +2400,12 @@ void mips_regs_to_machine(int format, char* mips_instr, uint32_t* machine_instr)
 		// I-Format Exceptions (Special cases)
 		case 3: {
 			char delim1[2] = ")";
-			temp = strtok(mips_instr, delim);
 
-			while (temp != NULL) {
+			while ((temp = strtok_r(save, delim, &save))) {
+				if (count > 0) {
+					temp++;
+				}
+
 				if (count == 1 && *(temp) != '$') { 
 					// either $reg0 imm($reg1) or $reg0 imm
 					char* offs = strchr(temp, '(');
@@ -2379,16 +2413,10 @@ void mips_regs_to_machine(int format, char* mips_instr, uint32_t* machine_instr)
 					// $rt imm($rs)
 					if (offs != NULL) { 
 						char* t = strtok(temp, delim1);
+						int len = strlen(t);
 						immediate = atoi(t);
 
-						int len = strlen(t);
-						temp = (temp + len + 2);
-						int i = 0;
-						while (temp[i] != ')') { // this may not be ideal but can change later
-							t[i] = temp[i];
-						}
-
-						reg_temp = decode_mips_register(t); // rs
+						reg_temp = decode_mips_register((temp + (len-2))); // rs
 						reg_temp <<= 21;
 						*machine_instr += reg_temp;
 						reg_temp = r0; // rt
@@ -2410,7 +2438,7 @@ void mips_regs_to_machine(int format, char* mips_instr, uint32_t* machine_instr)
 				} else {
 					// $rs $rt imm
 					if (count == 2 && *(temp) != '$') {
-						immediate = atoi(temp);
+						immediate = strtol(temp, NULL, 16);
 						// Add rt rs imm all into the instruction to be returned
 						reg_temp = r0;
 						reg_temp <<= 21;
@@ -2440,8 +2468,6 @@ void mips_regs_to_machine(int format, char* mips_instr, uint32_t* machine_instr)
 					}
 				}
 				count++;
-				temp = strtok(NULL, delim);
-				temp++;
 			}
 		break;
 		}

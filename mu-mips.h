@@ -39,10 +39,9 @@ mem_region_t MEM_REGIONS[] = {
 #define MIPS_REGS 32
 
 typedef struct CPU_State_Struct {
-
   uint32_t PC;		                   /* program counter */
-  uint32_t REGS[MIPS_REGS]; /* register file. */
-  uint32_t HI, LO;                          /* special regs for mult/div. */
+  uint32_t REGS[MIPS_REGS]; 		   /* register file. */
+  uint32_t HI, LO;                     /* special regs for mult/div. */
 } CPU_State;
 
 typedef struct CPU_Pipeline_Reg_Struct{
@@ -71,7 +70,7 @@ uint32_t PROGRAM_SIZE; /*in words*/
 /* Pipeline Registers.                                                                                                        */
 /***************************************************************/
 CPU_Pipeline_Reg ID_IF;
-CPU_Pipeline_Reg IF_EX;
+CPU_Pipeline_Reg ID_EX;
 CPU_Pipeline_Reg EX_MEM;
 CPU_Pipeline_Reg MEM_WB;
 
@@ -99,6 +98,15 @@ void MEM();/*IMPLEMENT THIS*/
 void EX();/*IMPLEMENT THIS*/
 void ID();/*IMPLEMENT THIS*/
 void IF();/*IMPLEMENT THIS*/
+void isolate_vars(uint32_t instruction_code,
+				uint32_t* opcode,
+				uint32_t* rs, 
+				uint32_t* rt, 
+				uint32_t* rd, 
+				uint32_t* shamt,
+				uint32_t* funct,
+				uint32_t* immediate,
+				uint32_t* address)
 void show_pipeline();/*IMPLEMENT THIS*/
 void initialize();
 void print_program(); /*IMPLEMENT THIS*/
