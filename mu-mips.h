@@ -98,15 +98,18 @@ void MEM();/*IMPLEMENT THIS*/
 void EX();/*IMPLEMENT THIS*/
 void ID();/*IMPLEMENT THIS*/
 void IF();/*IMPLEMENT THIS*/
-void isolate_vars(uint32_t instruction_code,
+void ID_decode_operands(uint32_t instruction,
+				uint32_t* rs, // A
+				uint32_t* rt, // B
+				uint32_t* immediate);
+void EX_perform_operation(uint32_t instruction,
+				uint32_t A, // rs
+				uint32_t B, // rt
+				uint32_t imm,
 				uint32_t* opcode,
-				uint32_t* rs, 
-				uint32_t* rt, 
-				uint32_t* rd, 
 				uint32_t* shamt,
 				uint32_t* funct,
-				uint32_t* immediate,
-				uint32_t* address)
+				uint32_t* address);
 void show_pipeline();/*IMPLEMENT THIS*/
 void initialize();
 void print_program(); /*IMPLEMENT THIS*/
