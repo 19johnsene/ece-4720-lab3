@@ -69,7 +69,7 @@ uint32_t PROGRAM_SIZE; /*in words*/
 /***************************************************************/
 /* Pipeline Registers.                                                                                                        */
 /***************************************************************/
-CPU_Pipeline_Reg ID_IF;
+CPU_Pipeline_Reg IF_ID;
 CPU_Pipeline_Reg ID_EX;
 CPU_Pipeline_Reg EX_MEM;
 CPU_Pipeline_Reg MEM_WB;
@@ -102,6 +102,19 @@ void ID_decode_operands(uint32_t instruction,
 				uint32_t* rs, // A
 				uint32_t* rt, // B
 				uint32_t* immediate);
+void EX_decode_operands(uint32_t instruction,
+				uint32_t* opcode, 
+				uint32_t* shamt, 
+				uint32_t* funct,
+				uint32_t* address);
+void MEM_decode_operands(uint32_t instruction,
+				uint32_t* opcode, 
+				uint32_t* funct,
+				uint32_t* address);
+void WB_decode_operands(uint32_t instruction,
+				uint32_t* rd,
+				uint32_t* opcode, 
+				uint32_t* funct);
 void EX_perform_operation(uint32_t instruction,
 				uint32_t A, // rs
 				uint32_t B, // rt
@@ -109,7 +122,15 @@ void EX_perform_operation(uint32_t instruction,
 				uint32_t* opcode,
 				uint32_t* shamt,
 				uint32_t* funct,
-				uint32_t* address);
+				uint32_t* address); // later - for jump instr
+void MEM_access(uint32_t instruction,
+				uint32_t opcode,
+				uint32_t funct,
+				uint32_t address);
+void WB_populate_destination(uint32_t instruction,
+				uint32_t rd,
+				uint32_t opcode,
+				uint32_t funct);
 void show_pipeline();/*IMPLEMENT THIS*/
 void initialize();
 void print_program(); /*IMPLEMENT THIS*/

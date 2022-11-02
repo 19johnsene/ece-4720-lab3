@@ -326,7 +326,14 @@ void handle_pipeline()
 /************************************************************/
 void WB()
 {
-	/*IMPLEMENT THIS*/
+	uint32_t opcode;
+	uint32_t funct;	
+	uint32_t rd;
+
+	WB_decode_operands(MEM_WB.IR, &rd, &opcode, &funct);
+
+	WB_populate_destination(MEM_WB.IR, rd, opcode, funct);
+	
 	INSTRUCTION_COUNT++;
 }
 
@@ -335,7 +342,17 @@ void WB()
 /************************************************************/
 void MEM()
 {
-	/*IMPLEMENT THIS*/
+	uint32_t opcode;
+	uint32_t funct;
+	uint32_t addr;
+	
+	// Get the current instruction
+	MEM_WB.IR = EX_MEM.IR;
+
+	MEM_decode_operands(ID_EX.IR, &opcode, &funct, &addr);
+
+	// Perform the current memory operation
+	MEM_access(MEM_WB.IR, opcode, funct, addr);
 }
 
 /************************************************************/
@@ -351,6 +368,8 @@ void EX()
 	
 	// Get the current instruction 
 	EX_MEM.IR = ID_EX.IR;
+
+	EX_decode_operands(ID_EX.IR, &opcode, &shamt, &funct, &addr);
 
 	// Perform the current operation and store the values
 	EX_perform_operation(EX_MEM.IR, ID_EX.A, ID_EX.B, ID_EX.imm, &opcode, &shamt, &funct, &addr);
@@ -368,7 +387,7 @@ void ID()
 	uint32_t immediate;
 	
 	// Get the current instruction
-	ID_EX.IR = ID_IF.IR;
+	ID_EX.IR = IF_ID.IR;
 
 	// Decode the registers in the instruction
 	ID_decode_operands(ID_EX.IR, &rs, &rt, &immediate);
@@ -391,10 +410,10 @@ void ID()
 void IF()
 {
 	// IR <= Mem[PC] 
-	ID_IF.IR = mem_read_32(CURRENT_STATE.PC);
+	IF_ID.IR = mem_read_32(CURRENT_STATE.PC);
 
 	// PC <= PC + 4
-	ID_IF.PC = NEXT_STATE.PC + 4;
+	IF_ID.PC = CURRENT_STATE.PC + 4; // next state or current?
 }
 
 /**************************************************************/
@@ -406,36 +425,30 @@ void ID_decode_operands(uint32_t instruction,
 				uint32_t* rt, 
 				uint32_t* immediate)
 		{
-		uint32_t temp;
+	uint32_t temp;
+	temp = instruction;
+	temp <<= 6;
+	temp >>= 27;
+	*rs = temp;
 
-		temp = instruction;
-		temp <<= 6;
-		temp >>= 27;
-		*rs = temp;
+	temp = instruction;
+	temp <<= 11;
+	temp >>= 27;
+	*rt = temp;
 
-		temp = instruction;
-		temp <<= 11;
-		temp >>= 27;
-		*rt = temp;
-
-		temp = instruction;
-		temp <<= 16;
-		temp >>= 16;
-		*immediate = temp;	
-
-		return;			
+	temp = instruction;
+	temp <<= 16;
+	temp >>= 16;
+	*immediate = temp;		
 }
 
-void EX_perform_operation(uint32_t instruction,
-				uint32_t A,
-				uint32_t B,
-				uint32_t imm,
-				uint32_t* opcode,
-				uint32_t* shamt,
+void EX_decode_operands(uint32_t instruction,
+				uint32_t* opcode, 
+				uint32_t* shamt, 
 				uint32_t* funct,
-				uint32_t* address) {
+				uint32_t* address)
+		{
 	uint32_t temp;
-		
 	temp = instruction;
 	temp >>= 26;
 	*opcode = temp;
@@ -453,17 +466,67 @@ void EX_perform_operation(uint32_t instruction,
 	temp = instruction;
 	temp <<= 6;
 	temp >>= 6;
+	*address = temp;		
+}
+
+void MEM_decode_operands(uint32_t instruction,
+				uint32_t* opcode, 
+				uint32_t* funct,
+				uint32_t* address) {
+	uint32_t temp;
+	temp = instruction;
+	temp >>= 26;
+	*opcode = temp;
+
+	temp = instruction;
+	temp <<= 26;
+	temp >>= 26;
+	*funct = temp;
+
+	temp = instruction;
+	temp <<= 6;
+	temp >>= 6;
 	*address = temp;
+}
+
+void WB_decode_operands(uint32_t instruction,
+				uint32_t* rd,
+				uint32_t* opcode, 
+				uint32_t* funct) {
+	uint32_t temp;
+	temp = instruction;
+	temp >>= 26;
+	*opcode = temp;
+	
+	temp = instruction;
+	temp <<= 16;
+	temp >>= 27;
+	*rd = temp;
+
+	temp = instruction;
+	temp <<= 26;
+	temp >>= 26;
+	*funct = temp;
+}
+
+void EX_perform_operation(uint32_t instruction,
+				uint32_t A,
+				uint32_t B,
+				uint32_t imm,
+				uint32_t opcode,
+				uint32_t shamt,
+				uint32_t funct,
+				uint32_t address) {
 
 	// Operations can be:
 	// 1. ALUOutput <= A + imm
 	// 2. ALUOutput <= A op B
 	// 3. ALUOutput <= A op imm
 
-	switch (*opcode) {
+	switch (opcode) {
 		// R-format
 		case (0x0):
-			switch (*funct) {
+			switch (funct) {
 				case (0x20): // add
 					EX_MEM.ALUOutput = A + B;
 				break;
@@ -493,26 +556,26 @@ void EX_perform_operation(uint32_t instruction,
 				break;
 
 				case (0x27): // nor	
-					EX_MEM.ALUOutput = !(A || B);
+					EX_MEM.ALUOutput = ~(A | B);
 					break;
 
 				case (0x18): { // mult
-					// ?
+					EX_MEM.ALUOutput = (A * B);
 				break;
 				}
 
 				case (0x19): { // multu
-					// ?
+					EX_MEM.ALUOutput = (A * B);
 				break;
 				}
 
 				case (0x1A): { // div
-					// ?
+					EX_MEM.ALUOutput = (A / B);
 				break;
 				}
 
 				case (0x1B): { // divu
-					// ?
+					EX_MEM.ALUOutput = (A / B);
 				break;
 				}
 
@@ -521,15 +584,15 @@ void EX_perform_operation(uint32_t instruction,
 				break;
 
 				case (0x00): // sll
-					EX_MEM.ALUOutput = B << *shamt;
+					EX_MEM.ALUOutput = B << shamt;
 				break;
 
 				case (0x02): // srl
-					EX_MEM.ALUOutput = B >> *shamt;
+					EX_MEM.ALUOutput = B >> shamt;
 				break;
 
 				case (0x3):  // sra
-					EX_MEM.ALUOutput = B >> *shamt;
+					EX_MEM.ALUOutput = B >> shamt;
 				break;
 
 				case (0x9):  // jalr	
@@ -537,18 +600,23 @@ void EX_perform_operation(uint32_t instruction,
 				break;
 
 				case (0x10): // mfhi
+					// WB only
 				break;
 
 				case (0x12): // mflo
+					// WB only
 				break;
 
 				case (0x11): // mthi
+					EX_MEM.ALUOutput = A;
 				break;
 
 				case (0x13): // mtlo
+					EX_MEM.ALUOutput = A;
 				break;
 
 				case (0x8):  // jr
+					// Do this later
 				break;
 
 				case (0xC):  // syscall
@@ -563,9 +631,11 @@ void EX_perform_operation(uint32_t instruction,
 
 		// J-format
 		case (0x2): // j
+			// Do this later
 		break;
 
 		case (0x3): // jal
+			// Do this later
 		break;
 
 		
@@ -626,19 +696,306 @@ void EX_perform_operation(uint32_t instruction,
 		break;
 
 		case (0x1):  // bltz or bgez
-			
+			// Do this later
 		break;
 
 		case (0x4):  // beq
+			// Do this later
 		break;
 
 		case (0x5):  // bne
+			// Do this later
 		break;
 
 		case (0x6):  // blez
+			// Do this later
 		break;
 
 		case (0x7):  // bgtz
+			// Do this later
+		break;
+
+		default:
+			printf("Error[EX_perform_operation]: Invalid instruction\n");
+		break;
+	}
+
+	return;
+}
+
+void MEM_access(uint32_t instruction,
+				uint32_t opcode,
+				uint32_t funct,
+				uint32_t address) {
+
+	MEM_WB.ALUOutput = EX_MEM.ALUOutput;
+	
+	switch (opcode) {
+		// R-format
+		case (0x0):
+			// Does not use MEM
+		break;
+
+
+		// J-format
+		case (0x2): // j
+			// Do this later
+		break;
+
+		case (0x3): // jal
+			// Do this later
+		break;
+
+		
+		// I-format
+		case (0x8):  // addi
+		break;
+
+		case (0x9):  // addiu
+		break;
+
+		case (0xD):  // ori
+		break;
+
+		case (0xE):  // xori
+		break;
+
+		case (0xA):  // slti
+		break;
+
+		case (0x23): // lw
+		case (0x32): // lb
+		case (0x36): // lh		
+			MEM_WB.LMD = mem_read_32(EX_MEM.ALUOutput);
+		break;
+
+		case (0xF):  // lui
+		break;
+
+		case (0x2B): // sw
+		case (0x28): // sb
+		case (0x29): // sh 
+			mem_write_32(EX_MEM.ALUOutput, EX_MEM.B);
+		break;
+
+		case (0x1):  // bltz or bgez
+			// Do this later
+		break;
+
+		case (0x4):  // beq
+			// Do this later
+		break;
+
+		case (0x5):  // bne
+			// Do this later
+		break;
+
+		case (0x6):  // blez
+			// Do this later
+		break;
+
+		case (0x7):  // bgtz
+			// Do this later
+		break;
+
+		default:
+			printf("Error[EX_perform_operation]: Invalid instruction\n");
+		break;
+	}
+
+	return;
+}
+
+void WB_populate_destination(uint32_t instruction,
+				uint32_t rd,
+				uint32_t opcode,
+				uint32_t funct) {
+	switch (opcode) {
+		// R-format
+		case (0x0):
+			switch (funct) {
+				case (0x20): // add
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x21): // addu
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x22): // sub
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x23): // subu
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x24): // and
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x25): // or
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x26): // xor	
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x27): // nor	
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+					break;
+
+				case (0x18): // mult
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x19): // multu
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x1A): // div
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x1B): // divu
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x2A): // slt
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x00): // sll
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x02): // srl
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x3):  // sra
+					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+				break;
+
+				case (0x9):  // jalr	
+					// Do this later
+				break;
+
+				case (0x10): // mfhi
+					NEXT_STATE.REGS[rd] = CURRENT_STATE.HI;
+				break;
+
+				case (0x12): // mflo
+					NEXT_STATE.REGS[rd] = CURRENT_STATE.LO;
+				break;
+
+				case (0x11): // mthi
+					NEXT_STATE.HI;
+				break;
+
+				case (0x13): // mtlo
+					NEXT_STATE.LO;
+				break;
+
+				case (0x8):  // jr
+					// Do this later
+				break;
+
+				case (0xC):  // syscall
+				break;
+
+				default:
+					printf("ERROR[EX_perform_operation]: Invalid instruction (R)\n");
+				break;
+			}
+		break;
+
+
+		// J-format
+		case (0x2): // j
+			// Do this later
+		break;
+
+		case (0x3): // jal
+			// Do this later
+		break;
+
+		
+		// I-format
+		case (0x8):  // addi
+			EX_MEM.ALUOutput = A + imm;
+		break;
+
+		case (0x9):  // addiu
+			EX_MEM.ALUOutput = A + imm;
+		break;
+
+		case (0xD):  // ori
+			EX_MEM.ALUOutput = (A || imm);
+		break;
+
+		case (0xE):  // xori
+			EX_MEM.ALUOutput = (A ^ imm);
+		break;
+
+		case (0xA):  // slti
+			EX_MEM.ALUOutput = (A < imm) ? 1 : 0;
+		break;
+
+		case (0x23): // lw
+			EX_MEM.ALUOutput = A + imm;
+			EX_MEM.B = ID_EX.B;
+		break;
+
+		case (0x32): // lb
+			EX_MEM.ALUOutput = A + imm;
+			EX_MEM.B = ID_EX.B;
+		break;
+
+		case (0x36): // lh		
+			EX_MEM.ALUOutput = A + imm;
+			EX_MEM.B = ID_EX.B;
+		break;
+
+		case (0xF):  // lui
+			EX_MEM.ALUOutput = A + imm;
+			EX_MEM.B = ID_EX.B;
+		break;
+
+		case (0x2B): // sw
+			EX_MEM.ALUOutput = A + imm;
+			EX_MEM.B = ID_EX.B;
+		break;
+
+		case (0x28): // sb
+			EX_MEM.ALUOutput = A + imm;
+			EX_MEM.B = ID_EX.B;
+		break;
+
+		case (0x29): // sh 
+			EX_MEM.ALUOutput = A + imm;
+			EX_MEM.B = ID_EX.B;
+		break;
+
+		case (0x1):  // bltz or bgez
+			// Do this later
+		break;
+
+		case (0x4):  // beq
+			// Do this later
+		break;
+
+		case (0x5):  // bne
+			// Do this later
+		break;
+
+		case (0x6):  // blez
+			// Do this later
+		break;
+
+		case (0x7):  // bgtz
+			// Do this later
 		break;
 
 		default:
