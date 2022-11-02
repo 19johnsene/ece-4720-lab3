@@ -501,8 +501,7 @@ void EX_decode_operands(uint32_t instruction,
 				uint32_t* opcode, 
 				uint32_t* shamt, 
 				uint32_t* funct,
-				uint32_t* address)
-		{
+				uint32_t* addr) {
 	uint32_t temp;
 	temp = instruction;
 	temp >>= 26;
@@ -521,7 +520,7 @@ void EX_decode_operands(uint32_t instruction,
 	temp = instruction;
 	temp <<= 6;
 	temp >>= 6;
-	*address = temp;		
+	*addr = temp;		
 }
 
 /**************************************************************/

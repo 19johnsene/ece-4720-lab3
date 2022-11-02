@@ -115,7 +115,7 @@ void EX_decode_operands(uint32_t instruction,
 				uint32_t* opcode, 
 				uint32_t* shamt, 
 				uint32_t* funct,
-				uint32_t* address);
+				uint32_t* addr);
 void MEM_decode_operands(uint32_t instruction,
 				uint32_t* opcode, 
 				uint32_t* funct,
@@ -125,6 +125,7 @@ void WB_decode_operands(uint32_t instruction,
 				uint32_t* rd,
 				uint32_t* opcode, 
 				uint32_t* funct);
+void decode_machine_register(uint32_t reg, char* buffer);
 void EX_perform_operation(uint32_t instruction,
 				uint32_t A, // rs
 				uint32_t B, // rt
