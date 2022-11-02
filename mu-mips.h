@@ -93,11 +93,20 @@ void reset();
 void init_memory();
 void load_program();
 void handle_pipeline(); /*IMPLEMENT THIS*/
-void WB();/*IMPLEMENT THIS*/
-void MEM();/*IMPLEMENT THIS*/
-void EX();/*IMPLEMENT THIS*/
-void ID();/*IMPLEMENT THIS*/
-void IF();/*IMPLEMENT THIS*/
+void WB();
+void MEM();
+void EX();
+void ID();
+void IF();
+void decode_all_operands(uint32_t instruction,
+				uint32_t* opcode,
+				uint32_t* rs, 
+				uint32_t* rt, 
+				uint32_t* rd, 
+				uint32_t* shamt, 
+				uint32_t* funct, 
+				uint32_t* immediate,
+				uint32_t* address);
 void ID_decode_operands(uint32_t instruction,
 				uint32_t* rs, // A
 				uint32_t* rt, // B
@@ -112,6 +121,7 @@ void MEM_decode_operands(uint32_t instruction,
 				uint32_t* funct,
 				uint32_t* address);
 void WB_decode_operands(uint32_t instruction,
+				uint32_t* rt,
 				uint32_t* rd,
 				uint32_t* opcode, 
 				uint32_t* funct);
@@ -119,19 +129,21 @@ void EX_perform_operation(uint32_t instruction,
 				uint32_t A, // rs
 				uint32_t B, // rt
 				uint32_t imm,
-				uint32_t* opcode,
-				uint32_t* shamt,
-				uint32_t* funct,
-				uint32_t* address); // later - for jump instr
+				uint32_t opcode,
+				uint32_t shamt,
+				uint32_t funct,
+				uint32_t address); // later - for jump instr
 void MEM_access(uint32_t instruction,
 				uint32_t opcode,
 				uint32_t funct,
 				uint32_t address);
 void WB_populate_destination(uint32_t instruction,
+				uint32_t rt,
 				uint32_t rd,
 				uint32_t opcode,
 				uint32_t funct);
 void show_pipeline();/*IMPLEMENT THIS*/
 void initialize();
-void print_program(); /*IMPLEMENT THIS*/
+void print_program();
+void print_instruction(uint32_t addr);
 

@@ -328,11 +328,12 @@ void WB()
 {
 	uint32_t opcode;
 	uint32_t funct;	
+	uint32_t rt;
 	uint32_t rd;
 
-	WB_decode_operands(MEM_WB.IR, &rd, &opcode, &funct);
+	WB_decode_operands(MEM_WB.IR, &rt, &rd, &opcode, &funct);
 
-	WB_populate_destination(MEM_WB.IR, rd, opcode, funct);
+	WB_populate_destination(MEM_WB.IR, rt, rd, opcode, funct);
 	
 	INSTRUCTION_COUNT++;
 }
@@ -372,7 +373,7 @@ void EX()
 	EX_decode_operands(ID_EX.IR, &opcode, &shamt, &funct, &addr);
 
 	// Perform the current operation and store the values
-	EX_perform_operation(EX_MEM.IR, ID_EX.A, ID_EX.B, ID_EX.imm, &opcode, &shamt, &funct, &addr);
+	EX_perform_operation(EX_MEM.IR, ID_EX.A, ID_EX.B, ID_EX.imm, opcode, shamt, funct, addr);
 
 	return;
 }
@@ -416,9 +417,59 @@ void IF()
 	IF_ID.PC = CURRENT_STATE.PC + 4; // next state or current?
 }
 
+void decode_all_operands(uint32_t instruction,
+				uint32_t* opcode,
+				uint32_t* rs, 
+				uint32_t* rt, 
+				uint32_t* rd, 
+				uint32_t* shamt, 
+				uint32_t* funct, 
+				uint32_t* immediate,
+				uint32_t* address) {
+	uint32_t temp;
+	temp = instruction;
+	temp >>= 26;
+	*opcode = temp;
+	
+	temp = instruction;
+	temp <<= 6;
+	temp >>= 27;
+	*rs = temp;
+
+	temp = instruction;
+	temp <<= 11;
+	temp >>= 27;
+	*rt = temp;
+
+	temp = instruction;
+	temp <<= 16;
+	temp >>= 27;
+	*rd = temp;
+
+	temp = instruction;
+	temp <<= 21;
+	temp >>= 27;
+	*shamt = temp;	
+
+	temp = instruction;
+	temp <<= 26;
+	temp >>= 26;
+	*funct = temp;
+
+	temp = instruction;
+	temp <<= 16;
+	temp >>= 16;
+	*immediate = temp;	
+
+	temp = instruction;
+	temp <<= 6;
+	temp >>= 6;
+	*address = temp;
+}
+
 /**************************************************************/
-/* Isolates portions of 32-bit binary instruction to determine register                                */
-/* values (opcode, rs, rt, rd, shamt, funct, immediate, and address)                                   */
+/* Isolates portions of 32-bit binary instruction to determine operands                                  */
+/* needed for Decode stage of pipeline       								                             */
 /**************************************************************/
 void ID_decode_operands(uint32_t instruction,
 				uint32_t* rs, 
@@ -442,6 +493,10 @@ void ID_decode_operands(uint32_t instruction,
 	*immediate = temp;		
 }
 
+/**************************************************************/
+/* Isolates portions of 32-bit binary instruction to determine operands                                  */
+/* needed for Execute stage of pipeline       								                             */
+/**************************************************************/
 void EX_decode_operands(uint32_t instruction,
 				uint32_t* opcode, 
 				uint32_t* shamt, 
@@ -469,6 +524,10 @@ void EX_decode_operands(uint32_t instruction,
 	*address = temp;		
 }
 
+/**************************************************************/
+/* Isolates portions of 32-bit binary instruction to determine operands                                  */
+/* needed for Memory stage of pipeline       								                             */
+/**************************************************************/
 void MEM_decode_operands(uint32_t instruction,
 				uint32_t* opcode, 
 				uint32_t* funct,
@@ -489,7 +548,12 @@ void MEM_decode_operands(uint32_t instruction,
 	*address = temp;
 }
 
+/**************************************************************/
+/* Isolates portions of 32-bit binary instruction to determine operands                                  */
+/* needed for Write Back stage of pipeline       								                         */
+/**************************************************************/
 void WB_decode_operands(uint32_t instruction,
+				uint32_t* rt,
 				uint32_t* rd,
 				uint32_t* opcode, 
 				uint32_t* funct) {
@@ -497,6 +561,11 @@ void WB_decode_operands(uint32_t instruction,
 	temp = instruction;
 	temp >>= 26;
 	*opcode = temp;
+
+	temp = instruction;
+	temp <<= 11;
+	temp >>= 27;
+	*rt = temp;
 	
 	temp = instruction;
 	temp <<= 16;
@@ -509,6 +578,157 @@ void WB_decode_operands(uint32_t instruction,
 	*funct = temp;
 }
 
+void decode_machine_register(uint32_t reg, char* buffer) {
+	switch (reg) {
+		// Constant value zero
+		case(0):
+			strcpy(buffer, "$zero");
+		break;
+		
+		// Assembler temporary
+		case(1):
+			strcpy(buffer, "$at");
+		break;
+
+		// Function results and expression eval 2-3
+		case(2):
+			strcpy(buffer, "$v0");
+		break;
+
+		case(3):
+			strcpy(buffer, "$v1");
+		break;	
+
+		// Arguments 4-7
+		case(4):
+			strcpy(buffer, "$a0");
+		break;
+
+		case(5):
+			strcpy(buffer, "$a1");
+		break;
+
+		case(6):
+			strcpy(buffer, "$a2");
+		break;
+
+		case(7):
+			strcpy(buffer, "$a3");
+		break;
+
+		// Temporaries 8-15
+		case(8):
+			strcpy(buffer, "$t0");
+		break;
+
+		case(9):
+			strcpy(buffer, "$t1");
+		break;	
+
+		case(10):
+			strcpy(buffer, "$t2");
+		break;	
+
+		case(11):
+			strcpy(buffer, "$t3");
+		break;	
+
+		case(12):
+			strcpy(buffer, "$t4");
+		break;	
+
+		case(13):
+			strcpy(buffer, "$t5");
+		break;	
+
+		case(14):
+			strcpy(buffer, "$t6");
+		break;	
+
+		case(15):
+			strcpy(buffer, "$t7");
+		break;	
+
+		// Saved temporaries 16-23
+		case(16):
+			strcpy(buffer, "$s0");
+		break;	
+
+		case(17):
+			strcpy(buffer, "$s1");
+		break;	
+
+		case(18):
+			strcpy(buffer, "$s2");
+		break;	
+
+		case(19):
+			strcpy(buffer, "$s3");
+		break;	
+
+		case(20):
+			strcpy(buffer, "$s4");
+		break;	
+
+		case(21):
+			strcpy(buffer, "$s5");
+		break;	
+
+		case(22):
+			strcpy(buffer, "$s6");
+		break;	
+
+		case(23):
+			strcpy(buffer, "$s7");
+		break;	
+
+		// Temporaries 24-25
+		case(24):
+			strcpy(buffer, "$t8");
+		break;	
+
+		case(25):
+			strcpy(buffer, "$t9");
+		break;	
+
+		// Reserved for OS kernel
+		case(26):
+			strcpy(buffer, "$k0");
+		break;	
+
+		case(27):
+			strcpy(buffer, "$k1");
+		break;	
+
+		// Global pointer
+		case(28):
+			strcpy(buffer, "$gp");
+		break;	
+
+		// Stack pointer
+		case(29):
+			strcpy(buffer, "$sp");
+		break;	
+
+		// Frame pointer
+		case(30):
+			strcpy(buffer, "$fp");
+		break;	
+		
+		// Return address
+		case(31):
+			strcpy(buffer, "$ra");
+		break;
+
+		default:
+			printf("Error[decode_machine_register]: Register not found\n");
+	}
+	return;
+}
+
+/**************************************************************/
+/* Performs the operation and stores result to be used in WB/MEM stage                                */
+/**************************************************************/
 void EX_perform_operation(uint32_t instruction,
 				uint32_t A,
 				uint32_t B,
@@ -517,11 +737,6 @@ void EX_perform_operation(uint32_t instruction,
 				uint32_t shamt,
 				uint32_t funct,
 				uint32_t address) {
-
-	// Operations can be:
-	// 1. ALUOutput <= A + imm
-	// 2. ALUOutput <= A op B
-	// 3. ALUOutput <= A op imm
 
 	switch (opcode) {
 		// R-format
@@ -559,25 +774,18 @@ void EX_perform_operation(uint32_t instruction,
 					EX_MEM.ALUOutput = ~(A | B);
 					break;
 
-				case (0x18): { // mult
-					EX_MEM.ALUOutput = (A * B);
-				break;
-				}
-
+				case (0x18): // mult
 				case (0x19): { // multu
-					EX_MEM.ALUOutput = (A * B);
-				break;
-				}
+					uint64_t result = (A * B);
+					NEXT_STATE.HI = (result >> 32);
+					NEXT_STATE.LO = ((result << 32) >> 32);
+				break; }
 
 				case (0x1A): { // div
-					EX_MEM.ALUOutput = (A / B);
-				break;
-				}
-
-				case (0x1B): { // divu
-					EX_MEM.ALUOutput = (A / B);
-				break;
-				}
+				case (0x1B): // divu
+					NEXT_STATE.LO = (A / B);
+					NEXT_STATE.HI = (A % B);
+				break; }
 
 				case (0x2A): // slt
 					EX_MEM.ALUOutput = (A < B) ? 1 : 0;
@@ -600,11 +808,7 @@ void EX_perform_operation(uint32_t instruction,
 				break;
 
 				case (0x10): // mfhi
-					// WB only
-				break;
-
 				case (0x12): // mflo
-					// WB only
 				break;
 
 				case (0x11): // mthi
@@ -676,7 +880,7 @@ void EX_perform_operation(uint32_t instruction,
 		break;
 
 		case (0xF):  // lui
-			EX_MEM.ALUOutput = A + imm;
+			EX_MEM.ALUOutput = (imm << 16);
 			EX_MEM.B = ID_EX.B;
 		break;
 
@@ -723,6 +927,9 @@ void EX_perform_operation(uint32_t instruction,
 	return;
 }
 
+/**************************************************************/
+/* Stores computed result in memory                    				                                */
+/**************************************************************/
 void MEM_access(uint32_t instruction,
 				uint32_t opcode,
 				uint32_t funct,
@@ -733,7 +940,6 @@ void MEM_access(uint32_t instruction,
 	switch (opcode) {
 		// R-format
 		case (0x0):
-			// Does not use MEM
 		break;
 
 
@@ -749,17 +955,9 @@ void MEM_access(uint32_t instruction,
 		
 		// I-format
 		case (0x8):  // addi
-		break;
-
 		case (0x9):  // addiu
-		break;
-
 		case (0xD):  // ori
-		break;
-
 		case (0xE):  // xori
-		break;
-
 		case (0xA):  // slti
 		break;
 
@@ -799,14 +997,18 @@ void MEM_access(uint32_t instruction,
 		break;
 
 		default:
-			printf("Error[EX_perform_operation]: Invalid instruction\n");
+			printf("Error[MEM_access]: Invalid instruction\n");
 		break;
 	}
 
 	return;
 }
 
+/**************************************************************/
+/* Writes computed result to destination register              		                                */
+/**************************************************************/
 void WB_populate_destination(uint32_t instruction,
+				uint32_t rt,
 				uint32_t rd,
 				uint32_t opcode,
 				uint32_t funct) {
@@ -815,49 +1017,19 @@ void WB_populate_destination(uint32_t instruction,
 		case (0x0):
 			switch (funct) {
 				case (0x20): // add
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x21): // addu
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x22): // sub
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x23): // subu
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x24): // and
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x25): // or
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x26): // xor	
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x27): // nor	
 					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-					break;
-
+				break;
+				
 				case (0x18): // mult
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x19): // multu
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x1A): // div
-					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
-				break;
-
 				case (0x1B): // divu
 					NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
 				break;
@@ -891,22 +1063,22 @@ void WB_populate_destination(uint32_t instruction,
 				break;
 
 				case (0x11): // mthi
-					NEXT_STATE.HI;
+					NEXT_STATE.HI = MEM_WB.ALUOutput;
 				break;
 
 				case (0x13): // mtlo
-					NEXT_STATE.LO;
+					NEXT_STATE.LO = MEM_WB.ALUOutput;
 				break;
 
 				case (0x8):  // jr
 					// Do this later
 				break;
 
-				case (0xC):  // syscall
+				case (0xC): // syscall
 				break;
 
 				default:
-					printf("ERROR[EX_perform_operation]: Invalid instruction (R)\n");
+					printf("ERROR[WB_populate_destination]: Invalid instruction (R)\n");
 				break;
 			}
 		break;
@@ -914,92 +1086,49 @@ void WB_populate_destination(uint32_t instruction,
 
 		// J-format
 		case (0x2): // j
-			// Do this later
-		break;
-
 		case (0x3): // jal
-			// Do this later
 		break;
 
 		
 		// I-format
 		case (0x8):  // addi
-			EX_MEM.ALUOutput = A + imm;
-		break;
-
 		case (0x9):  // addiu
-			EX_MEM.ALUOutput = A + imm;
-		break;
-
 		case (0xD):  // ori
-			EX_MEM.ALUOutput = (A || imm);
-		break;
-
 		case (0xE):  // xori
-			EX_MEM.ALUOutput = (A ^ imm);
-		break;
-
 		case (0xA):  // slti
-			EX_MEM.ALUOutput = (A < imm) ? 1 : 0;
+			NEXT_STATE.REGS[rt] = MEM_WB.ALUOutput;
 		break;
 
 		case (0x23): // lw
-			EX_MEM.ALUOutput = A + imm;
-			EX_MEM.B = ID_EX.B;
+			NEXT_STATE.REGS[rt] = MEM_WB.LMD;
 		break;
 
 		case (0x32): // lb
-			EX_MEM.ALUOutput = A + imm;
-			EX_MEM.B = ID_EX.B;
+			NEXT_STATE.REGS[rt] = MEM_WB.LMD;
 		break;
 
 		case (0x36): // lh		
-			EX_MEM.ALUOutput = A + imm;
-			EX_MEM.B = ID_EX.B;
+			NEXT_STATE.REGS[rt] = MEM_WB.LMD;
 		break;
 
 		case (0xF):  // lui
-			EX_MEM.ALUOutput = A + imm;
-			EX_MEM.B = ID_EX.B;
+			NEXT_STATE.REGS[rt] = MEM_WB.ALUOutput;
 		break;
 
 		case (0x2B): // sw
-			EX_MEM.ALUOutput = A + imm;
-			EX_MEM.B = ID_EX.B;
-		break;
-
 		case (0x28): // sb
-			EX_MEM.ALUOutput = A + imm;
-			EX_MEM.B = ID_EX.B;
-		break;
-
 		case (0x29): // sh 
-			EX_MEM.ALUOutput = A + imm;
-			EX_MEM.B = ID_EX.B;
 		break;
 
 		case (0x1):  // bltz or bgez
-			// Do this later
-		break;
-
 		case (0x4):  // beq
-			// Do this later
-		break;
-
 		case (0x5):  // bne
-			// Do this later
-		break;
-
 		case (0x6):  // blez
-			// Do this later
-		break;
-
 		case (0x7):  // bgtz
-			// Do this later
 		break;
 
 		default:
-			printf("Error[EX_perform_operation]: Invalid instruction\n");
+			printf("Error[WB_populate_destination]: Invalid instruction\n");
 		break;
 	}
 
@@ -1020,7 +1149,405 @@ void initialize() {
 /* Print the program loaded into memory (in MIPS assembly format)    */ 
 /************************************************************/
 void print_program(){
-	/*IMPLEMENT THIS*/
+	int i;
+	uint32_t addr;
+	
+	for(i=0; i<PROGRAM_SIZE; i++){
+		addr = MEM_TEXT_BEGIN + (i*4);
+		printf("[0x%x]\t", addr);
+		print_instruction(addr);
+	}
+}
+
+void print_instruction(uint32_t addr){
+	uint32_t instruction = 0;
+	uint32_t opcode;
+	uint32_t rs;
+	uint32_t rt;
+	uint32_t rd;
+	uint32_t shamt;
+	uint32_t funct;
+	uint32_t immediate;
+	uint32_t address;
+	uint32_t temp;
+	char reg_str[5];
+
+	// Step 1: Read in the instruction at the given memory addr
+	instruction = mem_read_32(addr);
+
+	// Step 2: Isolate instruction
+	decode_all_operands(instruction, &opcode, &rs, &rt, &rd, &shamt, &funct, &immediate, &address);
+
+	// Step 3: Enter switch statements for R, J, and I respectively
+	switch(opcode) {
+	
+		case (0x0): {  // R format
+			// [ op - 6][ rs - 5 ][ rt - 5 ][ rd - 5 ][ shamt - 5 ][ funct - 6 ]
+			switch(funct) {
+				case (0x20): // add
+					printf("add ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x21): // addu
+					printf("addu ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x22): // sub
+					printf("sub ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x23): // subu
+					printf("subu ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x24): // and
+					printf("and ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x25): // or
+					printf("or ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x26): // xor	
+					printf("xor ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+					break;
+
+				case (0x27): // nor	
+					printf("nor ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x18): // mult
+					printf("mult ");
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x19): // multu
+					printf("multu ");
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x1A): // div
+					printf("div ");
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x1B): // divu
+					printf("divu ");
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x2A): // slt
+					printf("slt ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rt, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x00): // sll
+					printf("sll ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, %d\n", reg_str, shamt);
+				break;
+
+				case (0x02): // srl
+					printf("srl ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, %d\n", reg_str, shamt);
+				break;
+
+				case (0x3):  // sra
+					printf("sra ");
+					decode_machine_register(rd, reg_str);
+					printf("%s, ", reg_str);
+					decode_machine_register(rs, reg_str);
+					printf("%s, %d\n", reg_str, shamt);
+				break;
+
+				case (0x10): // mfhi
+					printf("mfhi ");
+					decode_machine_register(rd, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x12): // mflo
+					printf("mflo ");
+					decode_machine_register(rd, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x11): // mthi
+					printf("mthi ");
+					decode_machine_register(rs, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x13): // mtlo
+					printf("mtlo ");
+					decode_machine_register(rs, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x8):  // jr
+					printf("jr ");
+					decode_machine_register(rs, reg_str);
+					printf("%s\n", reg_str);
+				break;
+
+				case (0x9):  // jalr	
+					printf("jalr ");
+					if (rd == 31) {
+						// format is rs
+						decode_machine_register(rs, reg_str);
+						printf("%s\n", reg_str);
+					} else {
+						// format is rd, rs
+						decode_machine_register(rd, reg_str);
+						printf("%s, ", reg_str);
+						decode_machine_register(rs, reg_str);
+						printf("%s\n", reg_str);
+					}
+				break;
+
+				case (0xC):  // syscall
+					printf("syscall\n");
+				break;
+
+				default:
+					printf("Error: Invalid instruction at memory location (R-format)\n");
+				break;
+			}
+		break;
+		}
+
+		// J-format
+		// [ op - 6][        const/address - 26        ]
+		case (0x2): // j
+			printf("j %d\n", (address << 2));
+		break;
+
+		case (0x3): // jal
+			printf("j %d\n", (address << 2));
+		break;
+
+		// I-format
+		// [ op - 6][ rs - 5 ][ rt - 5 ][    immmediate - 16    ]
+		case (0x8):  // addi
+			printf("addi ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%s, %d\n", reg_str, immediate);	
+		break;
+
+		case (0x9):  // addiu
+			printf("addiu ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%s, %d\n", reg_str, immediate);	
+		break;
+
+		case (0xC):  // andi
+			printf("andi ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%s, %d\n", reg_str, immediate);	
+		break;
+
+		case (0xD):  // ori
+			printf("ori ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%s, %d\n", reg_str, immediate);	
+		break;
+
+		case (0xE):  // xori
+			printf("xori ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%s, %d\n", reg_str, immediate);	
+		break;
+
+		case (0xA):  // slti
+			printf("slti ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%s, %d\n", reg_str, immediate);	
+		break;
+
+		case (0x23): // lw
+			printf("lw ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%d(%s)\n", immediate, reg_str);	
+		break;
+
+		case (0x32): // lb
+			printf("lb ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%d(%s)\n", immediate, reg_str);	
+		break;
+
+		case (0x36): // lh
+			printf("lh ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%d(%s)\n", immediate, reg_str);	
+		break;
+
+		case (0xF):  // lui
+			printf("lui ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, %d\n", reg_str, immediate);
+		break;
+
+		case (0x2B): // sw
+			printf("sw ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%d(%s)\n", immediate, reg_str);	
+		break;
+
+		case (0x28): // sb
+			printf("sb ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%d(%s)\n", immediate, reg_str);	
+		break;
+
+		case (0x29): // sh 
+			printf("sh ");
+			decode_machine_register(rt, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rs, reg_str);
+			printf("%d(%s)\n", immediate, reg_str);	
+		break;
+
+		case (0x1): { // bltz or bgez
+			if ( rt == 1 ) { // bgez
+				printf("bgez ");
+
+			} else if ( rt == 0 ) { // bltz
+				printf("bltz ");
+			} 
+			decode_machine_register(rt, reg_str);
+			printf("%s, 0x%x\n", reg_str, immediate);
+		break;
+		}
+
+		case (0x4): { // beq
+			printf("beq ");
+			decode_machine_register(rs, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rt, reg_str);
+			printf("%s, 0x%x\n", reg_str, immediate);
+		break;
+		}
+
+		case (0x5): { // bne
+			printf("bne ");
+			decode_machine_register(rs, reg_str);
+			printf("%s, ", reg_str);
+			decode_machine_register(rt, reg_str);
+			printf("%s, 0x%x\n", reg_str, immediate);
+		break;
+		}
+
+		case (0x6): { // blez
+			printf("blez ");
+			decode_machine_register(rs, reg_str);
+			printf("%s, 0x%x\n", reg_str, immediate);
+		break;
+		}
+
+		case (0x7): { // bgtz
+			printf("bgtz ");
+			decode_machine_register(rs, reg_str);
+			printf("%s, 0x%x\n", reg_str, immediate);
+		break;
+		}
+
+		default:
+			printf("Error[print_instruction]: Invalid instruction at memory location\n");
+		break;
+	}
 }
 
 /************************************************************/
