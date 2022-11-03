@@ -816,6 +816,7 @@ void EX_perform_operation(uint32_t A,
 				break;
 
 				case (0xC):  // syscall
+					EX_MEM.ALUOutput = 0xA;
 				break;
 
 				default:
@@ -1061,6 +1062,7 @@ void WB_populate_destination(uint32_t rt,
 				break;
 
 				case (0xC): // syscall
+					NEXT_STATE.REGS[2] = MEM_WB.ALUOutput
 				break;
 
 				default:
