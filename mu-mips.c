@@ -1155,7 +1155,6 @@ void print_instruction(uint32_t addr){
 	uint32_t funct;
 	uint32_t immediate;
 	uint32_t address;
-	uint32_t temp;
 	char reg_str[5];
 
 	// Step 1: Read in the instruction at the given memory addr

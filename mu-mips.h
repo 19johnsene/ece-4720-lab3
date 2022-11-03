@@ -118,7 +118,6 @@ void EX_decode_operands(uint32_t instruction,
 				uint32_t* addr);
 void MEM_decode_operands(uint32_t instruction,
 				uint32_t* opcode, 
-				uint32_t* funct,
 				uint32_t* address);
 void WB_decode_operands(uint32_t instruction,
 				uint32_t* rt,
