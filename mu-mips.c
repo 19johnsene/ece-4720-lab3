@@ -311,9 +311,6 @@ void load_program() {
 /************************************************************/
 void handle_pipeline()
 {
-	/*INSTRUCTION_COUNT should be incremented when instruction is done*/
-	/*Since we do not have branch/jump instructions, INSTRUCTION_COUNT should be incremented in WB stage */
-	
 	WB();
 	MEM();
 	EX();
@@ -326,14 +323,14 @@ void handle_pipeline()
 /************************************************************/
 void WB()
 {
-	uint32_t opcode;
-	uint32_t funct;	
 	uint32_t rt;
 	uint32_t rd;
+	uint32_t opcode;
+	uint32_t funct;	
 
 	WB_decode_operands(MEM_WB.IR, &rt, &rd, &opcode, &funct);
 
-	WB_populate_destination(MEM_WB.IR, rt, rd, opcode, funct);
+	WB_populate_destination(rt, rd, opcode, funct);
 	
 	INSTRUCTION_COUNT++;
 }
@@ -344,16 +341,17 @@ void WB()
 void MEM()
 {
 	uint32_t opcode;
-	uint32_t funct;
 	uint32_t addr;
 	
 	// Get the current instruction
 	MEM_WB.IR = EX_MEM.IR;
+	MEM_WB.ALUOutput = EX_MEM.ALUOutput;
+	MEM_WB.B = EX_MEM.B;
 
-	MEM_decode_operands(ID_EX.IR, &opcode, &funct, &addr);
+	MEM_decode_operands(ID_EX.IR, &opcode, &addr);
 
 	// Perform the current memory operation
-	MEM_access(MEM_WB.IR, opcode, funct, addr);
+	MEM_access(opcode, addr);
 }
 
 /************************************************************/
@@ -361,19 +359,21 @@ void MEM()
 /************************************************************/
 void EX()
 {
-	// Local vars
 	uint32_t opcode;
 	uint32_t shamt;
 	uint32_t funct;
 	uint32_t addr;
 	
-	// Get the current instruction 
+	// Get the current instruction & operands
 	EX_MEM.IR = ID_EX.IR;
+	EX_MEM.A = ID_EX.A;
+	EX_MEM.B = ID_EX.B;
+	EX_MEM.imm = ID_EX.imm;
 
 	EX_decode_operands(ID_EX.IR, &opcode, &shamt, &funct, &addr);
 
 	// Perform the current operation and store the values
-	EX_perform_operation(EX_MEM.IR, ID_EX.A, ID_EX.B, ID_EX.imm, opcode, shamt, funct, addr);
+	EX_perform_operation(EX_MEM.A, EX_MEM.B, EX_MEM.imm, opcode, shamt, funct, addr);
 
 	return;
 }
@@ -414,7 +414,7 @@ void IF()
 	IF_ID.IR = mem_read_32(CURRENT_STATE.PC);
 
 	// PC <= PC + 4
-	IF_ID.PC = CURRENT_STATE.PC + 4; // next state or current?
+	IF_ID.PC = CURRENT_STATE.PC + 4;
 }
 
 void decode_all_operands(uint32_t instruction,
@@ -529,17 +529,11 @@ void EX_decode_operands(uint32_t instruction,
 /**************************************************************/
 void MEM_decode_operands(uint32_t instruction,
 				uint32_t* opcode, 
-				uint32_t* funct,
 				uint32_t* address) {
 	uint32_t temp;
 	temp = instruction;
 	temp >>= 26;
 	*opcode = temp;
-
-	temp = instruction;
-	temp <<= 26;
-	temp >>= 26;
-	*funct = temp;
 
 	temp = instruction;
 	temp <<= 6;
@@ -728,8 +722,7 @@ void decode_machine_register(uint32_t reg, char* buffer) {
 /**************************************************************/
 /* Performs the operation and stores result to be used in WB/MEM stage                                */
 /**************************************************************/
-void EX_perform_operation(uint32_t instruction,
-				uint32_t A,
+void EX_perform_operation(uint32_t A,
 				uint32_t B,
 				uint32_t imm,
 				uint32_t opcode,
@@ -929,12 +922,7 @@ void EX_perform_operation(uint32_t instruction,
 /**************************************************************/
 /* Stores computed result in memory                    				                                */
 /**************************************************************/
-void MEM_access(uint32_t instruction,
-				uint32_t opcode,
-				uint32_t funct,
-				uint32_t address) {
-
-	MEM_WB.ALUOutput = EX_MEM.ALUOutput;
+void MEM_access(uint32_t opcode, uint32_t address) {
 	
 	switch (opcode) {
 		// R-format
@@ -963,7 +951,7 @@ void MEM_access(uint32_t instruction,
 		case (0x23): // lw
 		case (0x32): // lb
 		case (0x36): // lh		
-			MEM_WB.LMD = mem_read_32(EX_MEM.ALUOutput);
+			MEM_WB.LMD = mem_read_32(MEM_WB.ALUOutput);
 		break;
 
 		case (0xF):  // lui
@@ -972,7 +960,7 @@ void MEM_access(uint32_t instruction,
 		case (0x2B): // sw
 		case (0x28): // sb
 		case (0x29): // sh 
-			mem_write_32(EX_MEM.ALUOutput, EX_MEM.B);
+			mem_write_32(MEM_WB.ALUOutput, MEM_WB.B);
 		break;
 
 		case (0x1):  // bltz or bgez
@@ -1006,8 +994,7 @@ void MEM_access(uint32_t instruction,
 /**************************************************************/
 /* Writes computed result to destination register              		                                */
 /**************************************************************/
-void WB_populate_destination(uint32_t instruction,
-				uint32_t rt,
+void WB_populate_destination(uint32_t rt,
 				uint32_t rd,
 				uint32_t opcode,
 				uint32_t funct) {
@@ -1547,13 +1534,38 @@ void print_instruction(uint32_t addr){
 			printf("Error[print_instruction]: Invalid instruction at memory location\n");
 		break;
 	}
+	return;
 }
 
 /************************************************************/
 /* Print the current pipeline                                                                                    */ 
 /************************************************************/
 void show_pipeline(){
-	/*IMPLEMENT THIS*/
+	printf("Current contents of the pipeline registers:\n\n");
+	printf("PC:\t%d\n", CURRENT_STATE.PC);
+	
+	// IF_ID
+	printf("IF/ID.IR\t%d\n", IF_ID.IR);
+	printf("IF/ID.PC\t%d\n", IF_ID.PC);
+
+	// ID_EX
+	printf("ID/EX.IR\t%d\n", ID_EX.IR);
+	printf("ID/EX.A\t%d\n", ID_EX.A);
+	printf("ID/EX.B\t%d\n", ID_EX.B);
+	printf("ID/EX.imm\t%d\n", ID_EX.imm);
+
+	// EX_MEM
+	printf("EX/MEM.IR\t%d\n", EX_MEM.IR);
+	printf("EX/MEM.A\t%d\n", EX_MEM.A);
+	printf("EX/MEM.B\t%d\n", EX_MEM.B);
+	printf("EX/MEM.ALUOutput\t%d\n", EX_MEM.ALUOutput);
+
+	// MEM_WB
+	printf("MEM_WB.IR\t%d\n", MEM_WB.IR);
+	printf("MEM_WB.ALUOutput\t%d\n", MEM_WB.ALUOutput);
+	printf("MEM_WB.LMD\t%d\n", MEM_WB.LMD);
+
+	return;
 }
 
 /***************************************************************/

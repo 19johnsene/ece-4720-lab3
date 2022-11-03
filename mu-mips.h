@@ -92,7 +92,7 @@ void handle_command();
 void reset();
 void init_memory();
 void load_program();
-void handle_pipeline(); /*IMPLEMENT THIS*/
+void handle_pipeline();
 void WB();
 void MEM();
 void EX();
@@ -126,24 +126,19 @@ void WB_decode_operands(uint32_t instruction,
 				uint32_t* opcode, 
 				uint32_t* funct);
 void decode_machine_register(uint32_t reg, char* buffer);
-void EX_perform_operation(uint32_t instruction,
-				uint32_t A, // rs
+void EX_perform_operation(uint32_t A, // rs
 				uint32_t B, // rt
 				uint32_t imm,
 				uint32_t opcode,
 				uint32_t shamt,
 				uint32_t funct,
 				uint32_t address); // later - for jump instr
-void MEM_access(uint32_t instruction,
-				uint32_t opcode,
-				uint32_t funct,
-				uint32_t address);
-void WB_populate_destination(uint32_t instruction,
-				uint32_t rt,
+void MEM_access(uint32_t opcode, uint32_t address);
+void WB_populate_destination(uint32_t rt,
 				uint32_t rd,
 				uint32_t opcode,
 				uint32_t funct);
-void show_pipeline();/*IMPLEMENT THIS*/
+void show_pipeline();
 void initialize();
 void print_program();
 void print_instruction(uint32_t addr);
