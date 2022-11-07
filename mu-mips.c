@@ -417,7 +417,7 @@ void IF()
 	IF_ID.PC = CURRENT_STATE.PC + 4;
 }
 
-void decode_all_operands(uint32_t instruction,
+void decode_all_operands(const uint32_t instruction,
 				uint32_t* opcode,
 				uint32_t* rs, 
 				uint32_t* rt, 
@@ -497,7 +497,7 @@ void ID_decode_operands(uint32_t instruction,
 /* Isolates portions of 32-bit binary instruction to determine operands                                  */
 /* needed for Execute stage of pipeline       								                             */
 /**************************************************************/
-void EX_decode_operands(uint32_t instruction,
+void EX_decode_operands(const uint32_t instruction,
 				uint32_t* opcode, 
 				uint32_t* shamt, 
 				uint32_t* funct,
@@ -527,7 +527,7 @@ void EX_decode_operands(uint32_t instruction,
 /* Isolates portions of 32-bit binary instruction to determine operands                                  */
 /* needed for Memory stage of pipeline       								                             */
 /**************************************************************/
-void MEM_decode_operands(uint32_t instruction,
+void MEM_decode_operands(const uint32_t instruction,
 				uint32_t* opcode, 
 				uint32_t* address) {
 	uint32_t temp;
@@ -545,7 +545,7 @@ void MEM_decode_operands(uint32_t instruction,
 /* Isolates portions of 32-bit binary instruction to determine operands                                  */
 /* needed for Write Back stage of pipeline       								                         */
 /**************************************************************/
-void WB_decode_operands(uint32_t instruction,
+void WB_decode_operands(const uint32_t instruction,
 				uint32_t* rt,
 				uint32_t* rd,
 				uint32_t* opcode, 
@@ -725,9 +725,9 @@ void decode_machine_register(uint32_t reg, char* buffer) {
 void EX_perform_operation(uint32_t A,
 				uint32_t B,
 				uint32_t imm,
-				uint32_t opcode,
+				const uint32_t opcode,
 				uint32_t shamt,
-				uint32_t funct,
+				const uint32_t funct,
 				uint32_t address) {
 
 	switch (opcode) {
@@ -923,7 +923,7 @@ void EX_perform_operation(uint32_t A,
 /**************************************************************/
 /* Stores computed result in memory                    				                                */
 /**************************************************************/
-void MEM_access(uint32_t opcode, uint32_t address) {
+void MEM_access(const uint32_t opcode, uint32_t address) {
 	
 	switch (opcode) {
 		// R-format
@@ -997,8 +997,8 @@ void MEM_access(uint32_t opcode, uint32_t address) {
 /**************************************************************/
 void WB_populate_destination(uint32_t rt,
 				uint32_t rd,
-				uint32_t opcode,
-				uint32_t funct) {
+				const uint32_t opcode,
+				const uint32_t funct) {
 	switch (opcode) {
 		// R-format
 		case (0x0):
@@ -1062,7 +1062,7 @@ void WB_populate_destination(uint32_t rt,
 				break;
 
 				case (0xC): // syscall
-					NEXT_STATE.REGS[2] = MEM_WB.ALUOutput
+					NEXT_STATE.REGS[2] = MEM_WB.ALUOutput;
 				break;
 
 				default:
@@ -1148,7 +1148,6 @@ void print_program(){
 }
 
 void print_instruction(uint32_t addr){
-	uint32_t instruction = 0;
 	uint32_t opcode;
 	uint32_t rs;
 	uint32_t rt;
@@ -1160,7 +1159,7 @@ void print_instruction(uint32_t addr){
 	char reg_str[5];
 
 	// Step 1: Read in the instruction at the given memory addr
-	instruction = mem_read_32(addr);
+	const uint32_t instruction = mem_read_32(addr);
 
 	// Step 2: Isolate instruction
 	decode_all_operands(instruction, &opcode, &rs, &rt, &rd, &shamt, &funct, &immediate, &address);
